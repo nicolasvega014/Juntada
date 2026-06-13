@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { getPasswordStrength } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
@@ -12,6 +13,10 @@ export async function POST(req: Request) {
 
   if (cleanAlias.length < 2) {
     return NextResponse.json({ error: "Alias mínimo 2 caracteres" }, { status: 400 });
+  }
+
+  if (!getPasswordStrength(password).ok) {
+    return NextResponse.json({ error: "La contraseña tiene que ser segura" }, { status: 400 });
   }
 
   const existing = await prisma.user.findUnique({ where: { name } });

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
+import { getPasswordStrength } from "@/lib/password";
 
 const P = {
   bg: "#0f0e17", card: "#1a1825", card2: "#221f30",
@@ -27,7 +28,7 @@ type NewGroupData = { name: string; emoji: string; eventDate: string | null };
 type NewExpenseData = { desc: string; amount: string; paidById: string; date: string };
 
 export default function App() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
   const [view, setView] = useState("groups");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -72,6 +73,13 @@ export default function App() {
 
   const sessionUser = session.user as NonNullable<typeof session>["user"] & AppSessionUser;
   const me: User = { id: sessionUser.id!, name: sessionUser.name!, avatar: sessionUser.avatar ?? "👤", alias: sessionUser.alias ?? null };
+  const updateProfileInGroups = (user: User) => {
+    setGroups((gs) => gs.map((g) => ({
+      ...g,
+      members: g.members.map((m) => (m.userId === user.id ? { ...m, user } : m)),
+      expenses: g.expenses.map((e) => (e.paidById === user.id ? { ...e, paidBy: user } : e)),
+    })));
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, fontFamily: "'Syne', sans-serif", color: P.text, position: "relative", overflow: "hidden" }}>
@@ -79,7 +87,7 @@ export default function App() {
       <div style={{ position: "fixed", borderRadius: "50%", filter: "blur(90px)", opacity: 0.15, pointerEvents: "none", zIndex: 0, width: 320, height: 320, background: "#7b2d8b", bottom: 80, right: -80 }} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 480, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-        <TopNav me={me} view={view} group={group} onBack={() => { setView("groups"); setActiveGroupId(null); }} onLogout={() => signOut()} />
+        <TopNav me={me} view={view} group={group} onBack={() => { setView("groups"); setActiveGroupId(null); }} onEditProfile={() => setModal("profile")} onLogout={() => signOut()} />
         <div style={{ flex: 1, padding: "0 16px 40px" }}>
           {view === "groups" && <GroupList groups={groups} today={today} onSelect={(id) => { setActiveGroupId(id); setView("group"); }} onNew={() => setModal("newGroup")} />}
           {view === "group" && group && (
@@ -120,6 +128,7 @@ export default function App() {
         }} />
       )}
       {modal === "invite" && group && <InviteModal group={group} onClose={() => setModal(null)} />}
+      {modal === "profile" && <ProfileModal me={me} onClose={() => setModal(null)} onSaved={async (user) => { updateProfileInGroups(user); await update({ user }); setModal(null); }} />}
       {(modal === "joinInvite" || (!modal && pendingInvite)) && pendingInvite && (
         <JoinInviteModal code={pendingInvite} onClose={() => { setModal(null); setPendingInvite(null); }}
           onJoin={async (groupId) => { setModal(null); setPendingInvite(null); await fetchGroups(); setActiveGroupId(groupId); setView("group"); }} />
@@ -179,9 +188,10 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
 function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const [name, setName] = useState(""); const [pass, setPass] = useState(""); const [alias, setAlias] = useState(""); const [avatar, setAvatar] = useState(AVATARS[0]); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  const strength = getPasswordStrength(pass);
   const handle = async () => {
     if (name.trim().length < 2) { setErr("Mínimo 2 caracteres"); return; }
-    if (pass.length < 4) { setErr("Contraseña mínimo 4 caracteres"); return; }
+    if (!strength.ok) { setErr("La contraseña tiene que ser segura"); return; }
     if (alias.trim().length < 2) { setErr("Alias mínimo 2 caracteres"); return; }
     setErr(""); setLoading(true);
     const res = await fetch("/api/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), password: pass, avatar, alias: alias.trim() }) });
@@ -200,14 +210,46 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="¿Cómo te llaman?" style={inp} /></div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="@tu.alias, CVU o celular" style={inp} /></div>
-      <div style={{ marginBottom: 20 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••" style={inp} /></div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" style={inp} /></div>
+      <PasswordStrengthMeter password={pass} />
       {err && <div style={{ color: P.red, fontSize: 13, marginBottom: 14, textAlign: "center" }}>{err}</div>}
       <button onClick={handle} disabled={loading || !name || !pass || !alias.trim()} style={primBtn(true)}>{loading ? "Creando..." : "Crear cuenta →"}</button>
     </div>
   );
 }
 
-function TopNav({ me, view, group, onBack, onLogout }: { me: User; view: string; group?: Group; onBack: () => void; onLogout: () => void }) {
+function PasswordStrengthMeter({ password }: { password: string }) {
+  const strength = getPasswordStrength(password);
+  const items = [
+    ["8 caracteres", strength.checks.length],
+    ["minúscula", strength.checks.lower],
+    ["mayúscula", strength.checks.upper],
+    ["número", strength.checks.number],
+    ["símbolo", strength.checks.symbol],
+    ["no común", strength.checks.uncommon],
+  ] as const;
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${P.border}`, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ color: P.muted, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>Seguridad</span>
+        <span style={{ color: strength.ok ? P.green : strength.score >= 4 ? P.accent2 : P.red, fontSize: 12, fontWeight: 900 }}>{strength.label}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4, marginBottom: 10 }}>
+        {items.map(([label, ok]) => <div key={label} style={{ background: ok ? P.green : P.border, borderRadius: 99, height: 5 }} />)}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {items.map(([label, ok]) => (
+          <span key={label} style={{ color: ok ? P.green : P.muted, border: `1px solid ${ok ? `${P.green}66` : P.border}`, borderRadius: 999, fontSize: 10, fontWeight: 800, padding: "4px 7px" }}>
+            {ok ? "✓" : "•"} {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TopNav({ me, view, group, onBack, onEditProfile, onLogout }: { me: User; view: string; group?: Group; onBack: () => void; onEditProfile: () => void; onLogout: () => void }) {
   const title = view === "groups" ? "🍖 Juntada" : group ? `${group.emoji} ${group.name}` : "🍖 Juntada";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px", background: "rgba(15,14,23,0.88)", backdropFilter: "blur(14px)", position: "sticky", top: 0, zIndex: 10 }}>
@@ -215,12 +257,12 @@ function TopNav({ me, view, group, onBack, onLogout }: { me: User; view: string;
         {view !== "groups" && <button onClick={onBack} style={{ ...iconBtn, fontSize: 20 }}>←</button>}
         <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>{title}</span>
       </div>
-      <AccountMenu me={me} onLogout={onLogout} />
+      <AccountMenu me={me} onEditProfile={onEditProfile} onLogout={onLogout} />
     </div>
   );
 }
 
-function AccountMenu({ me, onLogout }: { me: User; onLogout: () => void }) {
+function AccountMenu({ me, onEditProfile, onLogout }: { me: User; onEditProfile: () => void; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -263,6 +305,13 @@ function AccountMenu({ me, onLogout }: { me: User; onLogout: () => void }) {
             <div style={{ color: P.muted, fontSize: 10, fontWeight: 800, marginBottom: 8, textTransform: "uppercase" }}>Alias de transferencia</div>
             <AliasPill alias={me.alias} />
           </div>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onEditProfile(); }}
+            style={{ ...primBtn(true), background: P.card2, border: `1px solid ${P.border}`, color: P.text, fontSize: 13, marginBottom: 8, padding: "11px 12px" }}
+          >
+            Editar perfil
+          </button>
           <button
             type="button"
             onClick={onLogout}
@@ -473,6 +522,68 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         {children}
       </div>
     </div>
+  );
+}
+
+function ProfileModal({ me, onClose, onSaved }: { me: User; onClose: () => void; onSaved: (user: User) => void }) {
+  const [name, setName] = useState(me.name);
+  const [alias, setAlias] = useState(me.alias ?? "");
+  const [avatar, setAvatar] = useState(me.avatar);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const newStrength = getPasswordStrength(newPassword);
+
+  const save = async () => {
+    if (name.trim().length < 2) { setErr("Nombre mínimo 2 caracteres"); return; }
+    if (alias.trim().length < 2) { setErr("Alias mínimo 2 caracteres"); return; }
+    if (newPassword && !newStrength.ok) { setErr("La contraseña nueva tiene que ser segura"); return; }
+    if (newPassword && !currentPassword) { setErr("Ingresá tu contraseña actual"); return; }
+
+    setErr(""); setLoading(true);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        alias: alias.trim(),
+        avatar,
+        currentPassword,
+        newPassword,
+      }),
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!res.ok) {
+      setErr(data.error ?? "No se pudo guardar");
+      setLoading(false);
+      return;
+    }
+
+    onSaved(data);
+    setLoading(false);
+  };
+
+  return (
+    <Modal title="Editar perfil" onClose={onClose}>
+      <div style={{ marginBottom: 16 }}>
+        <label style={lbl}>Avatar</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {AVATARS.map((a) => <button key={a} onClick={() => setAvatar(a)} style={{ fontSize: 20, background: avatar === a ? `${P.accent}33` : "transparent", border: `2px solid ${avatar === a ? P.accent : P.border}`, borderRadius: 10, padding: "5px 8px", cursor: "pointer", transform: avatar === a ? "scale(1.15)" : "scale(1)", transition: "all 0.15s" }}>{a}</button>)}
+        </div>
+      </div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} style={inp} /></div>
+      <div style={{ marginBottom: 20 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} style={inp} /></div>
+      <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
+        <div style={{ color: P.muted, fontSize: 11, fontWeight: 900, marginBottom: 12, textTransform: "uppercase" }}>Cambiar contraseña</div>
+        <div style={{ marginBottom: 12 }}><label style={lbl}>Contraseña actual</label><input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" style={inp} /></div>
+        <div style={{ marginBottom: 12 }}><label style={lbl}>Contraseña nueva</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Opcional" style={inp} /></div>
+        {newPassword && <PasswordStrengthMeter password={newPassword} />}
+      </div>
+      {err && <div style={{ color: P.red, fontSize: 13, marginBottom: 14, textAlign: "center" }}>{err}</div>}
+      <button onClick={save} disabled={loading || !name.trim() || !alias.trim()} style={primBtn(true)}>{loading ? "Guardando..." : "Guardar cambios"}</button>
+    </Modal>
   );
 }
 
