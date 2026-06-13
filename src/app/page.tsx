@@ -179,18 +179,21 @@ function Splash() {
 
 function AuthScreen({ view, onSwitch, onSuccess, pendingInvite }: { view: string; onSwitch: (v: string) => void; onSuccess: () => void; pendingInvite: string | null }) {
   return (
-    <div style={{ minHeight: "100vh", background: P.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Syne', sans-serif", color: P.text }}>
-      <div style={{ position: "fixed", borderRadius: "50%", filter: "blur(90px)", opacity: 0.15, pointerEvents: "none", width: 400, height: 400, background: P.accent, top: -100, left: -100 }} />
-      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 380 }}>
-        {pendingInvite && <div style={{ background: `${P.green}22`, border: `1px solid ${P.green}66`, borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: P.green, textAlign: "center" }}>🎉 Tenés una invitación. ¡Ingresá para unirte!</div>}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 52, marginBottom: 10 }}>🍖</div>
-          <h1 style={{ fontSize: 38, fontWeight: 900, letterSpacing: -1.5, margin: 0 }}>Juntada</h1>
-          <p style={{ color: P.muted, marginTop: 8, fontSize: 14 }}>Gastos compartidos sin drama</p>
+    <div style={{ minHeight: "100vh", background: `radial-gradient(circle at top, ${P.card2} 0, ${P.bg} 46%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Syne', sans-serif", color: P.text }}>
+      <div style={{ width: "100%", maxWidth: 410 }}>
+        {pendingInvite && <div style={{ background: `${P.green}18`, border: `1px solid ${P.green}66`, borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: P.green, textAlign: "center", fontWeight: 800 }}>Tenés una invitación para unirte</div>}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+            <div style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accent2})`, borderRadius: 16, boxShadow: "0 16px 38px rgba(255,107,53,0.22)", display: "grid", fontSize: 30, height: 58, placeItems: "center", width: 58 }}>🍖</div>
+            <div>
+              <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: 0, lineHeight: 1, margin: 0 }}>Juntada</h1>
+              <p style={{ color: P.muted, margin: "6px 0 0", fontSize: 13, fontWeight: 700 }}>Gastos compartidos, cuentas claras.</p>
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", background: P.card, borderRadius: 14, padding: 4, marginBottom: 24 }}>
+        <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${P.border}`, borderRadius: 18, padding: 5, display: "flex", marginBottom: 14 }}>
           {[["login", "Iniciar sesión"], ["register", "Registrarse"]].map(([v, label]) => (
-            <button key={v} onClick={() => onSwitch(v)} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, background: view === v ? P.accent : "transparent", color: view === v ? "#fff" : P.muted, transition: "all 0.2s" }}>{label}</button>
+            <button key={v} onClick={() => onSwitch(v)} style={{ flex: 1, padding: "12px 10px", border: "none", borderRadius: 13, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 14, background: view === v ? P.accent : "transparent", color: view === v ? "#fff" : P.muted, transition: "all 0.2s", boxShadow: view === v ? "0 10px 24px rgba(255,107,53,0.2)" : "none" }}>{label}</button>
           ))}
         </div>
         {view === "login" ? <LoginForm onSuccess={onSuccess} /> : <RegisterForm onSuccess={onSuccess} />}
@@ -209,11 +212,15 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(false);
   };
   return (
-    <div style={{ background: P.card, borderRadius: 20, padding: 24, border: `1px solid ${P.border}` }}>
-      <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre..." style={inp} onKeyDown={(e) => e.key === "Enter" && handle()} /></div>
-      <div style={{ marginBottom: 20 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••" style={inp} onKeyDown={(e) => e.key === "Enter" && handle()} /></div>
-      {err && <div style={{ color: P.red, fontSize: 13, marginBottom: 14, textAlign: "center" }}>{err}</div>}
-      <button onClick={handle} disabled={loading || !name || !pass} style={primBtn(true)}>{loading ? "Entrando..." : "Entrar →"}</button>
+    <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 22, boxShadow: "0 22px 70px rgba(0,0,0,0.28)", padding: 24 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 5 }}>Entrar a tu cuenta</div>
+        <div style={{ color: P.muted, fontSize: 13 }}>Usá tu nombre y contraseña para seguir.</div>
+      </div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" style={inp} onKeyDown={(e) => e.key === "Enter" && handle()} /></div>
+      <div style={{ marginBottom: 18 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" style={inp} onKeyDown={(e) => e.key === "Enter" && handle()} /></div>
+      {err && <div style={{ background: `${P.red}14`, border: `1px solid ${P.red}55`, borderRadius: 12, color: P.red, fontSize: 13, fontWeight: 700, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>{err}</div>}
+      <button onClick={handle} disabled={loading || !name || !pass} style={{ ...primBtn(true), opacity: loading || !name || !pass ? 0.65 : 1 }}>{loading ? "Entrando..." : "Entrar"}</button>
     </div>
   );
 }
@@ -233,19 +240,23 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     onSuccess(); setLoading(false);
   };
   return (
-    <div style={{ background: P.card, borderRadius: 20, padding: 24, border: `1px solid ${P.border}` }}>
+    <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 22, boxShadow: "0 22px 70px rgba(0,0,0,0.28)", padding: 24 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 5 }}>Crear cuenta</div>
+        <div style={{ color: P.muted, fontSize: 13 }}>Tu alias queda listo para copiarlo en los pagos.</div>
+      </div>
       <div style={{ marginBottom: 16 }}>
-        <label style={lbl}>Elegí tu avatar</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {AVATARS.map((a) => <button key={a} onClick={() => setAvatar(a)} style={{ fontSize: 20, background: avatar === a ? `${P.accent}33` : "transparent", border: `2px solid ${avatar === a ? P.accent : P.border}`, borderRadius: 10, padding: "5px 8px", cursor: "pointer", transform: avatar === a ? "scale(1.15)" : "scale(1)", transition: "all 0.15s" }}>{a}</button>)}
+        <label style={lbl}>Avatar</label>
+        <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${P.border}`, borderRadius: 14, display: "flex", flexWrap: "wrap", gap: 8, padding: 10 }}>
+          {AVATARS.slice(0, 14).map((a) => <button key={a} onClick={() => setAvatar(a)} style={{ fontSize: 20, background: avatar === a ? `${P.accent}33` : "transparent", border: `2px solid ${avatar === a ? P.accent : "transparent"}`, borderRadius: 10, padding: "5px 8px", cursor: "pointer", transform: avatar === a ? "scale(1.12)" : "scale(1)", transition: "all 0.15s" }}>{a}</button>)}
         </div>
       </div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="¿Cómo te llaman?" style={inp} /></div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="@tu.alias, CVU o celular" style={inp} /></div>
       <div style={{ marginBottom: 16 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" style={inp} /></div>
       <PasswordStrengthMeter password={pass} />
-      {err && <div style={{ color: P.red, fontSize: 13, marginBottom: 14, textAlign: "center" }}>{err}</div>}
-      <button onClick={handle} disabled={loading || !name || !pass || !alias.trim()} style={primBtn(true)}>{loading ? "Creando..." : "Crear cuenta →"}</button>
+      {err && <div style={{ background: `${P.red}14`, border: `1px solid ${P.red}55`, borderRadius: 12, color: P.red, fontSize: 13, fontWeight: 700, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>{err}</div>}
+      <button onClick={handle} disabled={loading || !name || !pass || !alias.trim()} style={{ ...primBtn(true), opacity: loading || !name || !pass || !alias.trim() ? 0.65 : 1 }}>{loading ? "Creando..." : "Crear cuenta"}</button>
     </div>
   );
 }
