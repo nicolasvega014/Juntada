@@ -2,6 +2,38 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ groupId: string }> }
+) {
+  try {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    const { groupId } = await params;
+    const { status } = await req.json();
+    if (status !== "active" && status !== "finalized") {
+      return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+    }
+
+    const member = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    const group = await prisma.group.update({
+      where: { id: groupId },
+      data: { status, endedAt: status === "finalized" ? new Date() : null },
+    });
+
+    return NextResponse.json(group);
+  } catch (e) {
+    console.error("Error actualizando grupo:", e);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ groupId: string }> }

@@ -24,12 +24,12 @@ const iconAction = (tone: "default" | "danger" | "green" = "default"): React.CSS
   return { background: `${color}14`, border: `1px solid ${color}55`, borderRadius: 10, color, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 900, height: 32, minWidth: 32, padding: "0 9px" };
 };
 
-type User = { id: string; name: string; avatar: string; alias?: string | null };
+type User = { id: string; name: string; avatar: string; alias?: string | null; email?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
 type SettlementPayment = { id: string; amount: number; createdAt: string; from: User; fromId: string; to: User; toId: string };
 type Member = { user: User; userId: string };
-type Group = { id: string; name: string; emoji: string; inviteCode: string; eventDate?: string; members: Member[]; expenses: Expense[]; settlementPayments: SettlementPayment[] };
-type AppSessionUser = { id?: string; name?: string | null; avatar?: string | null; alias?: string | null };
+type Group = { id: string; name: string; emoji: string; inviteCode: string; status: "active" | "finalized"; eventDate?: string; endedAt?: string | null; members: Member[]; expenses: Expense[]; settlementPayments: SettlementPayment[] };
+type AppSessionUser = { id?: string; name?: string | null; email?: string | null; avatar?: string | null; alias?: string | null };
 type NewGroupData = { name: string; emoji: string; eventDate: string | null };
 type NewExpenseData = { desc: string; amount: string; paidById: string; date: string };
 
@@ -42,6 +42,11 @@ export default function App() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [authView, setAuthView] = useState("login");
   const [today] = useState(() => Date.now());
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const hash = window.location.hash;
+    return hash.startsWith("#reset=") ? hash.slice(7) : null;
+  });
   const [pendingInvite, setPendingInvite] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const hash = window.location.hash;
@@ -54,7 +59,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (window.location.hash.startsWith("#invite=")) window.location.hash = "";
+    if (window.location.hash.startsWith("#invite=") || window.location.hash.startsWith("#reset=")) window.location.hash = "";
   }, []);
 
   useEffect(() => {
@@ -75,11 +80,11 @@ export default function App() {
   const group = groups.find((g) => g.id === activeGroupId);
 
   if (status === "loading") return <Splash />;
-  if (status === "unauthenticated") return <AuthScreen view={authView} onSwitch={setAuthView} onSuccess={fetchGroups} pendingInvite={pendingInvite} />;
+  if (status === "unauthenticated") return <AuthScreen view={authView} onSwitch={setAuthView} onSuccess={fetchGroups} pendingInvite={pendingInvite} resetToken={resetToken} onResetDone={() => { setResetToken(null); setAuthView("login"); }} />;
   if (!session?.user) return <Splash />;
 
   const sessionUser = session.user as NonNullable<typeof session>["user"] & AppSessionUser;
-  const me: User = { id: sessionUser.id!, name: sessionUser.name!, avatar: sessionUser.avatar ?? "👤", alias: sessionUser.alias ?? null };
+  const me: User = { id: sessionUser.id!, name: sessionUser.name!, email: sessionUser.email ?? null, avatar: sessionUser.avatar ?? "👤", alias: sessionUser.alias ?? null };
   const updateProfileInGroups = (user: User) => {
     setGroups((gs) => gs.map((g) => ({
       ...g,
@@ -120,6 +125,13 @@ export default function App() {
                 }
               }}
               onShowInvite={() => setModal("invite")}
+              onSetStatus={async (nextStatus) => {
+                const res = await fetch(`/api/groups/${group.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) });
+                if (res.ok) {
+                  const updated = await res.json();
+                  setGroups((gs) => gs.map((g) => g.id === group.id ? { ...g, status: updated.status, endedAt: updated.endedAt } : g));
+                }
+              }}
               onDelete={async () => {
                 if (!confirm("¿Eliminar esta juntada? Se borrarán todos los gastos.")) return;
                 const res = await fetch(`/api/groups/${group.id}`, { method: "DELETE" });
@@ -182,7 +194,9 @@ function Splash() {
   );
 }
 
-function AuthScreen({ view, onSwitch, onSuccess, pendingInvite }: { view: string; onSwitch: (v: string) => void; onSuccess: () => void; pendingInvite: string | null }) {
+function AuthScreen({ view, onSwitch, onSuccess, pendingInvite, resetToken, onResetDone }: { view: string; onSwitch: (v: string) => void; onSuccess: () => void; pendingInvite: string | null; resetToken: string | null; onResetDone: () => void }) {
+  const authBody = resetToken ? <ResetPasswordForm token={resetToken} onDone={onResetDone} /> : view === "forgot" ? <ForgotPasswordForm onBack={() => onSwitch("login")} /> : view === "login" ? <LoginForm onSuccess={onSuccess} onForgot={() => onSwitch("forgot")} /> : <RegisterForm onSuccess={onSuccess} />;
+
   return (
     <div style={{ minHeight: "100vh", background: `radial-gradient(circle at top, ${P.card2} 0, ${P.bg} 46%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Syne', sans-serif", color: P.text }}>
       <div style={{ width: "100%", maxWidth: 410 }}>
@@ -196,18 +210,18 @@ function AuthScreen({ view, onSwitch, onSuccess, pendingInvite }: { view: string
             </div>
           </div>
         </div>
-        <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${P.border}`, borderRadius: 18, padding: 5, display: "flex", marginBottom: 14 }}>
+        {!resetToken && view !== "forgot" && <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${P.border}`, borderRadius: 18, padding: 5, display: "flex", marginBottom: 14 }}>
           {[["login", "Iniciar sesión"], ["register", "Registrarse"]].map(([v, label]) => (
             <button key={v} onClick={() => onSwitch(v)} style={{ flex: 1, padding: "12px 10px", border: "none", borderRadius: 13, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 14, background: view === v ? P.accent : "transparent", color: view === v ? "#fff" : P.muted, transition: "all 0.2s", boxShadow: view === v ? "0 10px 24px rgba(255,107,53,0.2)" : "none" }}>{label}</button>
           ))}
-        </div>
-        {view === "login" ? <LoginForm onSuccess={onSuccess} /> : <RegisterForm onSuccess={onSuccess} />}
+        </div>}
+        {authBody}
       </div>
     </div>
   );
 }
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+function LoginForm({ onSuccess, onForgot }: { onSuccess: () => void; onForgot: () => void }) {
   const [name, setName] = useState(""); const [pass, setPass] = useState(""); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const handle = async () => {
     setErr(""); setLoading(true);
@@ -226,19 +240,21 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       <div style={{ marginBottom: 18 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" style={inp} onKeyDown={(e) => e.key === "Enter" && handle()} /></div>
       {err && <div style={{ background: `${P.red}14`, border: `1px solid ${P.red}55`, borderRadius: 12, color: P.red, fontSize: 13, fontWeight: 700, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>{err}</div>}
       <button onClick={handle} disabled={loading || !name || !pass} style={{ ...primBtn(true), opacity: loading || !name || !pass ? 0.65 : 1 }}>{loading ? "Entrando..." : "Entrar"}</button>
+      <button onClick={onForgot} style={{ background: "transparent", border: "none", color: P.accent2, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, marginTop: 14, width: "100%" }}>Olvidé mi contraseña</button>
     </div>
   );
 }
 
 function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
-  const [name, setName] = useState(""); const [pass, setPass] = useState(""); const [alias, setAlias] = useState(""); const [avatar, setAvatar] = useState(AVATARS[0]); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [pass, setPass] = useState(""); const [alias, setAlias] = useState(""); const [avatar, setAvatar] = useState(AVATARS[0]); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const strength = getPasswordStrength(pass);
   const handle = async () => {
     if (name.trim().length < 2) { setErr("Mínimo 2 caracteres"); return; }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setErr("Email inválido"); return; }
     if (!strength.ok) { setErr("La contraseña tiene que ser segura"); return; }
     if (alias.trim().length < 2) { setErr("Alias mínimo 2 caracteres"); return; }
     setErr(""); setLoading(true);
-    const res = await fetch("/api/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), password: pass, avatar, alias: alias.trim() }) });
+    const res = await fetch("/api/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), email: email.trim(), password: pass, avatar, alias: alias.trim() }) });
     const data = await res.json();
     if (!res.ok) { setErr(data.error); setLoading(false); return; }
     await signIn("credentials", { name: name.trim(), password: pass, redirect: false });
@@ -257,11 +273,74 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="¿Cómo te llaman?" style={inp} /></div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" type="email" style={inp} /></div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="@tu.alias, CVU o celular" style={inp} /></div>
       <div style={{ marginBottom: 16 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" style={inp} /></div>
       <PasswordStrengthMeter password={pass} />
       {err && <div style={{ background: `${P.red}14`, border: `1px solid ${P.red}55`, borderRadius: 12, color: P.red, fontSize: 13, fontWeight: 700, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>{err}</div>}
-      <button onClick={handle} disabled={loading || !name || !pass || !alias.trim()} style={{ ...primBtn(true), opacity: loading || !name || !pass || !alias.trim() ? 0.65 : 1 }}>{loading ? "Creando..." : "Crear cuenta"}</button>
+      <button onClick={handle} disabled={loading || !name || !email || !pass || !alias.trim()} style={{ ...primBtn(true), opacity: loading || !name || !email || !pass || !alias.trim() ? 0.65 : 1 }}>{loading ? "Creando..." : "Crear cuenta"}</button>
+    </div>
+  );
+}
+
+function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    setLoading(true);
+    await fetch("/api/password/recover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    setSent(true);
+    setLoading(false);
+  };
+  return (
+    <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 22, boxShadow: "0 22px 70px rgba(0,0,0,0.28)", padding: 24 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 5 }}>Recuperar contraseña</div>
+        <div style={{ color: P.muted, fontSize: 13 }}>Te enviamos un link si el email está registrado.</div>
+      </div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="tu@email.com" style={inp} /></div>
+      {sent && <div style={{ background: `${P.green}12`, border: `1px solid ${P.green}44`, borderRadius: 12, color: P.green, fontSize: 13, fontWeight: 800, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>Si existe una cuenta, vas a recibir un link.</div>}
+      <button onClick={submit} disabled={loading || !email} style={{ ...primBtn(true), opacity: loading || !email ? 0.65 : 1 }}>{loading ? "Enviando..." : "Enviar link"}</button>
+      <button onClick={onBack} style={{ background: "transparent", border: "none", color: P.muted, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, marginTop: 14, width: "100%" }}>Volver</button>
+    </div>
+  );
+}
+
+function ResetPasswordForm({ token, onDone }: { token: string; onDone: () => void }) {
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const strength = getPasswordStrength(password);
+  const submit = async () => {
+    if (!strength.ok) { setErr("La contraseña tiene que ser segura"); return; }
+    setErr(""); setLoading(true);
+    const res = await fetch("/api/password/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }) });
+    const data = await res.json();
+    if (!res.ok) setErr(data.error ?? "No se pudo cambiar");
+    else setDone(true);
+    setLoading(false);
+  };
+  return (
+    <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 22, boxShadow: "0 22px 70px rgba(0,0,0,0.28)", padding: 24 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 5 }}>Nueva contraseña</div>
+        <div style={{ color: P.muted, fontSize: 13 }}>Elegí una contraseña segura para volver a entrar.</div>
+      </div>
+      {!done ? (
+        <>
+          <div style={{ marginBottom: 16 }}><label style={lbl}>Contraseña nueva</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={inp} /></div>
+          <PasswordStrengthMeter password={password} />
+          {err && <div style={{ background: `${P.red}14`, border: `1px solid ${P.red}55`, borderRadius: 12, color: P.red, fontSize: 13, fontWeight: 700, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>{err}</div>}
+          <button onClick={submit} disabled={loading || !password} style={{ ...primBtn(true), opacity: loading || !password ? 0.65 : 1 }}>{loading ? "Guardando..." : "Cambiar contraseña"}</button>
+        </>
+      ) : (
+        <>
+          <div style={{ background: `${P.green}12`, border: `1px solid ${P.green}44`, borderRadius: 12, color: P.green, fontSize: 13, fontWeight: 800, marginBottom: 14, padding: "10px 12px", textAlign: "center" }}>Contraseña actualizada.</div>
+          <button onClick={onDone} style={primBtn(true)}>Ir a iniciar sesión</button>
+        </>
+      )}
     </div>
   );
 }
@@ -412,6 +491,10 @@ function AliasPill({ alias }: { alias?: string | null }) {
 }
 
 function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today: number; onSelect: (id: string) => void; onNew: () => void }) {
+  const [filter, setFilter] = useState<"active" | "history">("active");
+  const visibleGroups = groups.filter((g) => filter === "active" ? g.status !== "finalized" : g.status === "finalized");
+  const activeCount = groups.filter((g) => g.status !== "finalized").length;
+  const historyCount = groups.length - activeCount;
   return (
     <div style={{ paddingTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
@@ -421,8 +504,13 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
         </div>
         <button onClick={onNew} style={primBtn()}>+ Nueva</button>
       </div>
-      {groups.length === 0 && <div style={{ textAlign: "center", color: P.muted, padding: "60px 0" }}><div style={{ fontSize: 52, marginBottom: 14 }}>🍽️</div><p style={{ fontSize: 15 }}>No tenés juntadas.<br />¡Creá una!</p></div>}
-      {groups.map((g) => {
+      <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, display: "flex", gap: 4, marginBottom: 16, padding: 4 }}>
+        {[["active", `Activas (${activeCount})`], ["history", `Historial (${historyCount})`]].map(([value, label]) => (
+          <button key={value} onClick={() => setFilter(value as "active" | "history")} style={{ background: filter === value ? P.accent : "transparent", border: "none", borderRadius: 10, color: filter === value ? "#fff" : P.muted, cursor: "pointer", flex: 1, fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 900, padding: "10px 8px" }}>{label}</button>
+        ))}
+      </div>
+      {visibleGroups.length === 0 && <div style={{ textAlign: "center", color: P.muted, padding: "60px 0" }}><div style={{ fontSize: 52, marginBottom: 14 }}>🍽️</div><p style={{ fontSize: 15 }}>{filter === "active" ? "No tenés juntadas activas." : "Todavía no hay juntadas finalizadas."}<br />{filter === "active" ? "¡Creá una!" : "Cuando cierres una, aparece acá."}</p></div>}
+      {visibleGroups.map((g) => {
         const total = g.expenses.reduce((s, e) => s + e.amount, 0);
         const perPerson = g.members.length > 0 ? total / g.members.length : 0;
         const eventDate = g.eventDate ? new Date(g.eventDate) : null;
@@ -434,6 +522,7 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{g.emoji} {g.name}</div>
+                {g.status === "finalized" && <div style={{ color: P.green, fontSize: 11, fontWeight: 900, marginBottom: 6, textTransform: "uppercase" }}>Finalizada</div>}
                 {eventDate && (
                   <div style={{ fontSize: 12, color: diffDays !== null && diffDays <= 1 ? P.accent : P.accent2, fontWeight: 700, marginBottom: 6 }}>
                     📅 {eventDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })} · {eventDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
@@ -457,7 +546,7 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
   );
 }
 
-function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onShowInvite, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onShowInvite: () => void; onDelete: () => void }) {
+function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onShowInvite, onSetStatus, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onShowInvite: () => void; onSetStatus: (status: "active" | "finalized") => void; onDelete: () => void }) {
   const members = group.members.map((m) => m.user);
   const total = group.expenses.reduce((s, e) => s + e.amount, 0);
   const perPerson = members.length > 0 ? total / members.length : 0;
@@ -469,6 +558,7 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
     if (paid[p.toId] !== undefined) paid[p.toId] -= p.amount;
   });
   const eventDate = group.eventDate ? new Date(group.eventDate) : null;
+  const finalized = group.status === "finalized";
 
   return (
     <div style={{ paddingTop: 14 }}>
@@ -495,9 +585,10 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
-          <button onClick={onAddExpense} style={{ ...primBtn(true), padding: "12px", fontSize: 14 }}>+ Gasto</button>
+          <button onClick={onAddExpense} disabled={finalized} style={{ ...primBtn(true), opacity: finalized ? 0.55 : 1, padding: "12px", fontSize: 14 }}>+ Gasto</button>
           <button onClick={onShowInvite} style={{ ...ghostBtn, borderColor: P.accent2, color: P.accent2, padding: "12px" }}>Copiar invitación</button>
         </div>
+        <button onClick={() => onSetStatus(finalized ? "active" : "finalized")} style={{ ...ghostBtn, borderColor: finalized ? P.accent2 : P.green, color: finalized ? P.accent2 : P.green, marginTop: 10, width: "100%", padding: "11px 12px" }}>{finalized ? "Reabrir juntada" : "Finalizar juntada"}</button>
       </div>
 
       <div style={{ marginBottom: 22 }}>
@@ -524,7 +615,7 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <span style={sectionTitle}>Gastos ({group.expenses.length})</span>
-        <button onClick={onAddExpense} style={iconAction()}>+</button>
+        <button onClick={onAddExpense} disabled={finalized} style={{ ...iconAction(), opacity: finalized ? 0.55 : 1 }}>+</button>
       </div>
       {group.expenses.length === 0 && <div style={{ background: P.card, border: `1px dashed ${P.border}`, borderRadius: 14, color: P.muted, textAlign: "center", padding: "28px 0", fontSize: 14 }}>Ningún gasto todavía.</div>}
       {[...group.expenses].reverse().map((e) => {
@@ -611,6 +702,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function ProfileModal({ me, onClose, onSaved }: { me: User; onClose: () => void; onSaved: (user: User) => void }) {
   const [name, setName] = useState(me.name);
+  const [email, setEmail] = useState(me.email ?? "");
   const [alias, setAlias] = useState(me.alias ?? "");
   const [avatar, setAvatar] = useState(me.avatar);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -621,6 +713,7 @@ function ProfileModal({ me, onClose, onSaved }: { me: User; onClose: () => void;
 
   const save = async () => {
     if (name.trim().length < 2) { setErr("Nombre mínimo 2 caracteres"); return; }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setErr("Email inválido"); return; }
     if (alias.trim().length < 2) { setErr("Alias mínimo 2 caracteres"); return; }
     if (newPassword && !newStrength.ok) { setErr("La contraseña nueva tiene que ser segura"); return; }
     if (newPassword && !currentPassword) { setErr("Ingresá tu contraseña actual"); return; }
@@ -631,6 +724,7 @@ function ProfileModal({ me, onClose, onSaved }: { me: User; onClose: () => void;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
+        email: email.trim(),
         alias: alias.trim(),
         avatar,
         currentPassword,
@@ -658,6 +752,7 @@ function ProfileModal({ me, onClose, onSaved }: { me: User; onClose: () => void;
         </div>
       </div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} style={inp} /></div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" style={inp} /></div>
       <div style={{ marginBottom: 20 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} style={inp} /></div>
       <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
         <div style={{ color: P.muted, fontSize: 11, fontWeight: 900, marginBottom: 12, textTransform: "uppercase" }}>Cambiar contraseña</div>

@@ -9,12 +9,14 @@ export async function PATCH(req: Request) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const { name, alias, avatar, currentPassword, newPassword } = await req.json();
+  const { name, email, alias, avatar, currentPassword, newPassword } = await req.json();
   const cleanName = typeof name === "string" ? name.trim() : "";
+  const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   const cleanAlias = typeof alias === "string" ? alias.trim() : "";
   const cleanAvatar = typeof avatar === "string" ? avatar : "";
 
   if (cleanName.length < 2) return NextResponse.json({ error: "Nombre mínimo 2 caracteres" }, { status: 400 });
+  if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) return NextResponse.json({ error: "Email inválido" }, { status: 400 });
   if (cleanAlias.length < 2) return NextResponse.json({ error: "Alias mínimo 2 caracteres" }, { status: 400 });
   if (!cleanAvatar) return NextResponse.json({ error: "Elegí un avatar" }, { status: 400 });
 
@@ -26,8 +28,14 @@ export async function PATCH(req: Request) {
     if (existing) return NextResponse.json({ error: "Ya existe ese usuario" }, { status: 400 });
   }
 
-  const data: { name: string; alias: string; avatar: string; password?: string } = {
+  if (cleanEmail !== user.email) {
+    const existingEmail = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (existingEmail) return NextResponse.json({ error: "Ya existe una cuenta con ese email" }, { status: 400 });
+  }
+
+  const data: { name: string; email: string; alias: string; avatar: string; password?: string } = {
     name: cleanName,
+    email: cleanEmail,
     alias: cleanAlias,
     avatar: cleanAvatar,
   };
@@ -46,7 +54,7 @@ export async function PATCH(req: Request) {
   const updated = await prisma.user.update({
     where: { id: userId },
     data,
-    select: { id: true, name: true, avatar: true, alias: true },
+    select: { id: true, name: true, email: true, avatar: true, alias: true },
   });
 
   return NextResponse.json(updated);
