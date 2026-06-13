@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
+import { CalendarDays, Check, Clipboard, Clock, Edit3, Link2, Plus, ReceiptText, Trash2, UsersRound, X } from "lucide-react";
 import { getPasswordStrength } from "@/lib/password";
 
 const P = {
@@ -21,8 +22,9 @@ const iconBtn: React.CSSProperties = { background: "transparent", border: "none"
 const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 900, letterSpacing: 0.3, textTransform: "uppercase", color: P.muted };
 const iconAction = (tone: "default" | "danger" | "green" = "default"): React.CSSProperties => {
   const color = tone === "danger" ? P.red : tone === "green" ? P.green : P.accent2;
-  return { background: `${color}14`, border: `1px solid ${color}55`, borderRadius: 10, color, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 900, height: 32, minWidth: 32, padding: "0 9px" };
+  return { alignItems: "center", background: `${color}14`, border: `1px solid ${color}55`, borderRadius: 10, color, cursor: "pointer", display: "inline-flex", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 900, gap: 6, height: 32, justifyContent: "center", minWidth: 32, padding: "0 9px" };
 };
+const iconStyle = { width: 16, height: 16, strokeWidth: 2.4 };
 
 type User = { id: string; name: string; avatar: string; alias?: string | null; email?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
@@ -189,7 +191,7 @@ export default function App() {
 function Splash() {
   return (
     <div style={{ minHeight: "100vh", background: P.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", color: P.text }}>
-      <div style={{ textAlign: "center" }}><div style={{ fontSize: 56 }}>🍖</div><div style={{ color: P.muted, fontSize: 14, marginTop: 14 }}>Cargando...</div></div>
+      <div style={{ textAlign: "center" }}><div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 18, display: "grid", height: 64, margin: "0 auto", placeItems: "center", width: 64 }}><ReceiptText style={{ width: 30, height: 30, color: P.accent2 }} /></div><div style={{ color: P.muted, fontSize: 14, marginTop: 14 }}>Cargando...</div></div>
     </div>
   );
 }
@@ -203,7 +205,7 @@ function AuthScreen({ view, onSwitch, onSuccess, pendingInvite, resetToken, onRe
         {pendingInvite && <div style={{ background: `${P.green}18`, border: `1px solid ${P.green}66`, borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: P.green, textAlign: "center", fontWeight: 800 }}>Tenés una invitación para unirte</div>}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-            <div style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accent2})`, borderRadius: 16, boxShadow: "0 16px 38px rgba(255,107,53,0.22)", display: "grid", fontSize: 30, height: 58, placeItems: "center", width: 58 }}>🍖</div>
+            <div style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accent2})`, borderRadius: 16, boxShadow: "0 16px 38px rgba(255,107,53,0.22)", display: "grid", height: 58, placeItems: "center", width: 58 }}><ReceiptText style={{ width: 30, height: 30, color: "#fff" }} /></div>
             <div>
               <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: 0, lineHeight: 1, margin: 0 }}>Juntada</h1>
               <p style={{ color: P.muted, margin: "6px 0 0", fontSize: 13, fontWeight: 700 }}>Gastos compartidos, cuentas claras.</p>
@@ -377,12 +379,13 @@ function PasswordStrengthMeter({ password }: { password: string }) {
 }
 
 function TopNav({ me, view, group, onBack, onEditProfile, onLogout }: { me: User; view: string; group?: Group; onBack: () => void; onEditProfile: () => void; onLogout: () => void }) {
-  const title = view === "groups" ? "🍖 Juntada" : group ? `${group.emoji} ${group.name}` : "🍖 Juntada";
+  const title = view === "groups" ? "Juntada" : group ? `${group.emoji} ${group.name}` : "Juntada";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px", background: "rgba(15,14,23,0.88)", backdropFilter: "blur(14px)", position: "sticky", top: 0, zIndex: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {view !== "groups" && <button onClick={onBack} style={{ ...iconBtn, fontSize: 20 }}>←</button>}
-        <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>{title}</span>
+        {view === "groups" && <ReceiptText style={{ width: 20, height: 20, color: P.accent2 }} />}
+        <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: 0 }}>{title}</span>
       </div>
       <AccountMenu me={me} onEditProfile={onEditProfile} onLogout={onLogout} />
     </div>
@@ -509,7 +512,7 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
           <button key={value} onClick={() => setFilter(value as "active" | "history")} style={{ background: filter === value ? P.accent : "transparent", border: "none", borderRadius: 10, color: filter === value ? "#fff" : P.muted, cursor: "pointer", flex: 1, fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 900, padding: "10px 8px" }}>{label}</button>
         ))}
       </div>
-      {visibleGroups.length === 0 && <div style={{ textAlign: "center", color: P.muted, padding: "60px 0" }}><div style={{ fontSize: 52, marginBottom: 14 }}>🍽️</div><p style={{ fontSize: 15 }}>{filter === "active" ? "No tenés juntadas activas." : "Todavía no hay juntadas finalizadas."}<br />{filter === "active" ? "¡Creá una!" : "Cuando cierres una, aparece acá."}</p></div>}
+      {visibleGroups.length === 0 && <div style={{ textAlign: "center", color: P.muted, padding: "60px 0" }}><div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 18, display: "grid", height: 64, margin: "0 auto 14px", placeItems: "center", width: 64 }}><UsersRound style={{ width: 30, height: 30, color: P.accent2 }} /></div><p style={{ fontSize: 15 }}>{filter === "active" ? "No tenés juntadas activas." : "Todavía no hay juntadas finalizadas."}<br />{filter === "active" ? "¡Creá una!" : "Cuando cierres una, aparece acá."}</p></div>}
       {visibleGroups.map((g) => {
         const total = g.expenses.reduce((s, e) => s + e.amount, 0);
         const perPerson = g.members.length > 0 ? total / g.members.length : 0;
@@ -525,7 +528,7 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
                 {g.status === "finalized" && <div style={{ color: P.green, fontSize: 11, fontWeight: 900, marginBottom: 6, textTransform: "uppercase" }}>Finalizada</div>}
                 {eventDate && (
                   <div style={{ fontSize: 12, color: diffDays !== null && diffDays <= 1 ? P.accent : P.accent2, fontWeight: 700, marginBottom: 6 }}>
-                    📅 {eventDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })} · {eventDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                    <CalendarDays style={{ ...iconStyle, width: 13, height: 13, verticalAlign: -2 }} /> {eventDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })} · {eventDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                     {diffDays !== null && diffDays >= 0 && <span style={{ marginLeft: 6, color: P.muted }}>({diffDays === 0 ? "¡hoy!" : diffDays === 1 ? "mañana" : `en ${diffDays} días`})</span>}
                   </div>
                 )}
@@ -564,7 +567,7 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
     <div style={{ paddingTop: 14 }}>
       {eventDate && (
         <div style={{ background: `${P.accent2}12`, border: `1px solid ${P.accent2}40`, borderRadius: 14, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ background: `${P.accent2}18`, borderRadius: 10, color: P.accent2, display: "grid", fontSize: 18, height: 36, placeItems: "center", width: 36 }}>⌚</span>
+          <span style={{ background: `${P.accent2}18`, borderRadius: 10, color: P.accent2, display: "grid", height: 36, placeItems: "center", width: 36 }}><Clock style={iconStyle} /></span>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: P.accent2 }}>{eventDate.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</div>
             <div style={{ fontSize: 13, color: P.muted }}>{eventDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} hs</div>
@@ -585,8 +588,8 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
-          <button onClick={onAddExpense} disabled={finalized} style={{ ...primBtn(true), opacity: finalized ? 0.55 : 1, padding: "12px", fontSize: 14 }}>+ Gasto</button>
-          <button onClick={onShowInvite} style={{ ...ghostBtn, borderColor: P.accent2, color: P.accent2, padding: "12px" }}>Copiar invitación</button>
+          <button onClick={onAddExpense} disabled={finalized} style={{ ...primBtn(true), alignItems: "center", display: "flex", gap: 8, justifyContent: "center", opacity: finalized ? 0.55 : 1, padding: "12px", fontSize: 14 }}><Plus style={iconStyle} /> Gasto</button>
+          <button onClick={onShowInvite} style={{ ...ghostBtn, alignItems: "center", borderColor: P.accent2, color: P.accent2, display: "flex", gap: 8, justifyContent: "center", padding: "12px" }}><Link2 style={iconStyle} /> Invitación</button>
         </div>
         <button onClick={() => onSetStatus(finalized ? "active" : "finalized")} style={{ ...ghostBtn, borderColor: finalized ? P.accent2 : P.green, color: finalized ? P.accent2 : P.green, marginTop: 10, width: "100%", padding: "11px 12px" }}>{finalized ? "Reabrir juntada" : "Finalizar juntada"}</button>
       </div>
@@ -595,7 +598,7 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <span style={sectionTitle}>Participantes</span>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onDelete} title="Eliminar juntada" style={iconAction("danger")}>×</button>
+            <button onClick={onDelete} title="Eliminar juntada" style={iconAction("danger")}><Trash2 style={iconStyle} /></button>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))", gap: 10 }}>
@@ -615,7 +618,7 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <span style={sectionTitle}>Gastos ({group.expenses.length})</span>
-        <button onClick={onAddExpense} disabled={finalized} style={{ ...iconAction(), opacity: finalized ? 0.55 : 1 }}>+</button>
+        <button onClick={onAddExpense} disabled={finalized} style={{ ...iconAction(), opacity: finalized ? 0.55 : 1 }}><Plus style={iconStyle} /></button>
       </div>
       {group.expenses.length === 0 && <div style={{ background: P.card, border: `1px dashed ${P.border}`, borderRadius: 14, color: P.muted, textAlign: "center", padding: "28px 0", fontSize: 14 }}>Ningún gasto todavía.</div>}
       {[...group.expenses].reverse().map((e) => {
@@ -630,8 +633,8 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: P.accent2 }}>{fmt(e.amount)}</div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => onEditExpense(e)} title="Editar gasto" style={iconAction()}>✎</button>
-                <button onClick={() => onDeleteExpense(e.id)} title="Borrar gasto" style={iconAction("danger")}>×</button>
+                <button onClick={() => onEditExpense(e)} title="Editar gasto" style={iconAction()}><Edit3 style={iconStyle} /></button>
+                <button onClick={() => onDeleteExpense(e.id)} title="Borrar gasto" style={iconAction("danger")}><Trash2 style={iconStyle} /></button>
               </div>
             </div>
           </div>
@@ -692,7 +695,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div style={{ background: P.card, borderRadius: "24px 24px 0 0", padding: 24, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", border: `1px solid ${P.border}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
           <span style={{ fontWeight: 900, fontSize: 19 }}>{title}</span>
-          <button onClick={onClose} style={iconBtn}>×</button>
+          <button onClick={onClose} style={{ ...iconBtn, display: "grid", placeItems: "center" }}><X style={iconStyle} /></button>
         </div>
         {children}
       </div>
@@ -778,7 +781,7 @@ function NewGroupModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
           {EMOJIS_GROUP.map((e) => <button key={e} onClick={() => setEmoji(e)} style={{ fontSize: 22, background: emoji === e ? `${P.accent}33` : "transparent", border: `1px solid ${emoji === e ? P.accent : P.border}`, borderRadius: 10, padding: "6px 10px", cursor: "pointer", transform: emoji === e ? "scale(1.2)" : "scale(1)", transition: "all 0.15s" }}>{e}</button>)}
         </div>
       </div>
-      <div style={{ marginBottom: 14 }}><label style={lbl}>📅 Fecha (opcional)</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Fecha (opcional)</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} /></div>
       {date && <div style={{ marginBottom: 20 }}><label style={lbl}>🕐 Hora</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inp} /></div>}
       <button onClick={() => { if (!name.trim()) return; const eventDate = date ? new Date(`${date}T${time}`).toISOString() : null; onCreate({ name: name.trim(), emoji, eventDate }); }} disabled={!name.trim()} style={primBtn(true)}>Crear juntada</button>
     </Modal>
@@ -822,11 +825,11 @@ function InviteModal({ group, onClose }: { group: Group; onClose: () => void }) 
   return (
     <Modal title="Invitar al grupo" onClose={onClose}>
       <div style={{ textAlign: "center", marginBottom: 22 }}>
-        <div style={{ fontSize: 48, marginBottom: 10 }}>🔗</div>
+        <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 18, display: "grid", height: 64, margin: "0 auto 12px", placeItems: "center", width: 64 }}><Link2 style={{ width: 30, height: 30, color: P.accent2 }} /></div>
         <p style={{ color: P.muted, fontSize: 14, lineHeight: 1.7 }}>Compartí este link.<br />Al abrirlo se unen a <strong style={{ color: P.text }}>{group.emoji} {group.name}</strong>.</p>
       </div>
       <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16, wordBreak: "break-all", fontSize: 12, color: P.muted, fontFamily: "monospace" }}>{link}</div>
-      <button onClick={copy} style={{ ...primBtn(true), background: copied ? P.green : P.accent, transition: "background 0.3s" }}>{copied ? "✅ ¡Copiado!" : "📋 Copiar link"}</button>
+      <button onClick={copy} style={{ ...primBtn(true), alignItems: "center", background: copied ? P.green : P.accent, display: "flex", gap: 8, justifyContent: "center", transition: "background 0.3s" }}>{copied ? <Check style={iconStyle} /> : <Clipboard style={iconStyle} />}{copied ? "¡Copiado!" : "Copiar link"}</button>
     </Modal>
   );
 }
@@ -839,14 +842,14 @@ function JoinInviteModal({ code, onClose, onJoin }: { code: string; onClose: () 
   if (loading) return <Modal title="Invitación" onClose={onClose}><div style={{ textAlign: "center", padding: 40, color: P.muted }}>Cargando...</div></Modal>;
   if (!group) return <Modal title="Invitación inválida" onClose={onClose}><div style={{ textAlign: "center", padding: 40, color: P.red }}>Este link no es válido.</div></Modal>;
   return (
-    <Modal title="Invitación recibida 🎉" onClose={onClose}>
+    <Modal title="Invitación recibida" onClose={onClose}>
       <div style={{ textAlign: "center", padding: "10px 0 20px" }}>
         <div style={{ fontSize: 52, marginBottom: 12 }}>{group.emoji}</div>
         <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900 }}>{group.name}</h2>
         <p style={{ color: P.muted, fontSize: 14 }}>Te invitaron a unirte.</p>
         <div style={{ fontSize: 18, margin: "10px 0" }}>{group.members.length} miembro{group.members.length !== 1 ? "s" : ""}</div>
       </div>
-      <button onClick={join} style={primBtn(true)}>🎉 Unirse</button>
+      <button onClick={join} style={{ ...primBtn(true), alignItems: "center", display: "flex", gap: 8, justifyContent: "center" }}><UsersRound style={iconStyle} /> Unirse</button>
       <button onClick={onClose} style={{ ...primBtn(true), background: "transparent", color: P.muted, border: `1px solid ${P.border}`, marginTop: 10 }}>Ahora no</button>
     </Modal>
   );
