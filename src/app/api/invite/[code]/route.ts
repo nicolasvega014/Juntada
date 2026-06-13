@@ -6,6 +6,7 @@ const userPublicSelect = {
   id: true,
   name: true,
   avatar: true,
+  alias: true,
 } as const;
 
 export async function GET(

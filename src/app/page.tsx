@@ -18,11 +18,11 @@ const primBtn = (full?: boolean): React.CSSProperties => ({ background: P.accent
 const ghostBtn: React.CSSProperties = { background: "transparent", color: P.accent, border: `1px solid ${P.accent}`, borderRadius: 10, padding: "7px 14px", cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13 };
 const iconBtn: React.CSSProperties = { background: "transparent", border: "none", color: P.text, cursor: "pointer", fontSize: 18, padding: "4px 8px", fontFamily: "'Syne', sans-serif" };
 
-type User = { id: string; name: string; avatar: string };
+type User = { id: string; name: string; avatar: string; alias?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
 type Member = { user: User; userId: string };
 type Group = { id: string; name: string; emoji: string; inviteCode: string; eventDate?: string; members: Member[]; expenses: Expense[] };
-type AppSessionUser = { id?: string; name?: string | null; avatar?: string | null };
+type AppSessionUser = { id?: string; name?: string | null; avatar?: string | null; alias?: string | null };
 type NewGroupData = { name: string; emoji: string; eventDate: string | null };
 type NewExpenseData = { desc: string; amount: string; paidById: string; date: string };
 
@@ -71,7 +71,7 @@ export default function App() {
   if (!session?.user) return <Splash />;
 
   const sessionUser = session.user as NonNullable<typeof session>["user"] & AppSessionUser;
-  const me: User = { id: sessionUser.id!, name: sessionUser.name!, avatar: sessionUser.avatar ?? "👤" };
+  const me: User = { id: sessionUser.id!, name: sessionUser.name!, avatar: sessionUser.avatar ?? "👤", alias: sessionUser.alias ?? null };
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, fontFamily: "'Syne', sans-serif", color: P.text, position: "relative", overflow: "hidden" }}>
@@ -178,12 +178,13 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
-  const [name, setName] = useState(""); const [pass, setPass] = useState(""); const [avatar, setAvatar] = useState(AVATARS[0]); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(""); const [pass, setPass] = useState(""); const [alias, setAlias] = useState(""); const [avatar, setAvatar] = useState(AVATARS[0]); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
   const handle = async () => {
     if (name.trim().length < 2) { setErr("Mínimo 2 caracteres"); return; }
     if (pass.length < 4) { setErr("Contraseña mínimo 4 caracteres"); return; }
+    if (alias.trim().length < 2) { setErr("Alias mínimo 2 caracteres"); return; }
     setErr(""); setLoading(true);
-    const res = await fetch("/api/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), password: pass, avatar }) });
+    const res = await fetch("/api/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), password: pass, avatar, alias: alias.trim() }) });
     const data = await res.json();
     if (!res.ok) { setErr(data.error); setLoading(false); return; }
     await signIn("credentials", { name: name.trim(), password: pass, redirect: false });
@@ -198,9 +199,10 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
       <div style={{ marginBottom: 14 }}><label style={lbl}>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="¿Cómo te llaman?" style={inp} /></div>
+      <div style={{ marginBottom: 14 }}><label style={lbl}>Alias de transferencia</label><input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="@tu.alias, CVU o celular" style={inp} /></div>
       <div style={{ marginBottom: 20 }}><label style={lbl}>Contraseña</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••" style={inp} /></div>
       {err && <div style={{ color: P.red, fontSize: 13, marginBottom: 14, textAlign: "center" }}>{err}</div>}
-      <button onClick={handle} disabled={loading || !name || !pass} style={primBtn(true)}>{loading ? "Creando..." : "Crear cuenta →"}</button>
+      <button onClick={handle} disabled={loading || !name || !pass || !alias.trim()} style={primBtn(true)}>{loading ? "Creando..." : "Crear cuenta →"}</button>
     </div>
   );
 }
@@ -219,6 +221,44 @@ function TopNav({ me, view, group, onBack, onLogout }: { me: User; view: string;
         <button onClick={onLogout} style={{ ...iconBtn, fontSize: 12, color: P.muted }}>salir</button>
       </div>
     </div>
+  );
+}
+
+function AliasPill({ alias }: { alias?: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const cleanAlias = alias?.trim();
+
+  if (!cleanAlias) {
+    return <span style={{ fontSize: 11, color: P.muted }}>sin alias</span>;
+  }
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(cleanAlias);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copiar alias"
+      style={{
+        background: copied ? `${P.green}24` : `${P.accent2}18`,
+        border: `1px solid ${copied ? P.green : `${P.accent2}66`}`,
+        borderRadius: 999,
+        color: copied ? P.green : P.accent2,
+        cursor: "pointer",
+        fontFamily: "'Syne', sans-serif",
+        fontSize: 11,
+        fontWeight: 800,
+        lineHeight: 1,
+        padding: "5px 8px",
+        transition: "all 0.15s",
+      }}
+    >
+      {copied ? "Copiado" : cleanAlias}
+    </button>
   );
 }
 
@@ -310,6 +350,7 @@ function GroupDetail({ group, onAddExpense, onShowInvite, onDelete }: { group: G
               <div key={m.id} style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: "10px 14px", textAlign: "center", minWidth: 72 }}>
                 <div style={{ fontSize: 26 }}>{m.avatar}</div>
                 <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2 }}>{m.name}</div>
+                <div style={{ marginTop: 6 }}><AliasPill alias={m.alias} /></div>
                 <div style={{ fontSize: 11, color: bal >= 0 ? P.green : P.red, fontWeight: 700, marginTop: 3 }}>{bal >= 0 ? "+" : ""}{fmt(bal)}</div>
               </div>
             );
@@ -358,11 +399,11 @@ function Settlements({ members, paid, perPerson }: { members: User[]; paid: Reco
       <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>💸 Quién le debe a quién</div>
       {debts.map((d, i) => (
         <div key={i} style={{ background: `${P.green}14`, border: `1px solid ${P.green}44`, borderRadius: 12, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 14, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 20 }}>{d.from.avatar}</span><span style={{ fontWeight: 700 }}>{d.from.name}</span>
+          <span style={{ fontSize: 20 }}>{d.from.avatar}</span><span style={{ fontWeight: 700 }}>{d.from.name}</span><AliasPill alias={d.from.alias} />
           <span style={{ color: P.muted }}>le debe</span>
           <span style={{ fontWeight: 900, color: P.green, fontSize: 16 }}>{fmt(d.amount)}</span>
           <span style={{ color: P.muted }}>a</span>
-          <span style={{ fontSize: 20 }}>{d.to.avatar}</span><span style={{ fontWeight: 700 }}>{d.to.name}</span>
+          <span style={{ fontSize: 20 }}>{d.to.avatar}</span><span style={{ fontWeight: 700 }}>{d.to.name}</span><AliasPill alias={d.to.alias} />
         </div>
       ))}
     </div>

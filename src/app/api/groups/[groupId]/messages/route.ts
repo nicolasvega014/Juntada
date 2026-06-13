@@ -28,6 +28,7 @@ export async function POST(
             id: true,
             name: true,
             avatar: true,
+            alias: true,
           },
         },
       },

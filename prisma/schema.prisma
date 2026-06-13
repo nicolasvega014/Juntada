@@ -11,6 +11,7 @@ model User {
   name      String   @unique
   password  String
   avatar    String
+  alias     String?
   createdAt DateTime @default(now())
 
   groups    GroupMember[]

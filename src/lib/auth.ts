@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 
 type UserWithAvatar = {
   avatar?: string | null;
+  alias?: string | null;
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -14,6 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.avatar = (user as UserWithAvatar).avatar;
+        token.alias = (user as UserWithAvatar).alias;
       }
       return token;
     },
@@ -21,6 +23,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token) {
         session.user.id = token.id as string;
         (session.user as UserWithAvatar).avatar = token.avatar as string | null;
+        (session.user as UserWithAvatar).alias = token.alias as string | null;
       }
       return session;
     },
@@ -43,7 +46,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user.password
         );
         if (!valid) return null;
-        return { id: user.id, name: user.name, avatar: user.avatar };
+        return { id: user.id, name: user.name, avatar: user.avatar, alias: user.alias };
       },
     }),
   ],
