@@ -13,6 +13,7 @@ export async function DELETE(
     const { groupId } = await params;
 
     await prisma.message.deleteMany({ where: { groupId } });
+    await prisma.settlementPayment.deleteMany({ where: { groupId } });
     await prisma.expense.deleteMany({ where: { groupId } });
     await prisma.groupMember.deleteMany({ where: { groupId } });
     await prisma.group.delete({ where: { id: groupId } });

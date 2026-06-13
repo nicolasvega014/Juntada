@@ -12,6 +12,7 @@ const userPublicSelect = {
 const groupPayload = {
   members: { include: { user: { select: userPublicSelect } } },
   expenses: { include: { paidBy: { select: userPublicSelect } } },
+  settlementPayments: { include: { from: { select: userPublicSelect }, to: { select: userPublicSelect } }, orderBy: { createdAt: "desc" } },
 } as const;
 
 export async function GET() {

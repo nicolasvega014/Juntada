@@ -21,8 +21,9 @@ const iconBtn: React.CSSProperties = { background: "transparent", border: "none"
 
 type User = { id: string; name: string; avatar: string; alias?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
+type SettlementPayment = { id: string; amount: number; createdAt: string; from: User; fromId: string; to: User; toId: string };
 type Member = { user: User; userId: string };
-type Group = { id: string; name: string; emoji: string; inviteCode: string; eventDate?: string; members: Member[]; expenses: Expense[] };
+type Group = { id: string; name: string; emoji: string; inviteCode: string; eventDate?: string; members: Member[]; expenses: Expense[]; settlementPayments: SettlementPayment[] };
 type AppSessionUser = { id?: string; name?: string | null; avatar?: string | null; alias?: string | null };
 type NewGroupData = { name: string; emoji: string; eventDate: string | null };
 type NewExpenseData = { desc: string; amount: string; paidById: string; date: string };
@@ -33,6 +34,7 @@ export default function App() {
   const [view, setView] = useState("groups");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [authView, setAuthView] = useState("login");
   const [today] = useState(() => Date.now());
   const [pendingInvite, setPendingInvite] = useState<string | null>(() => {
@@ -78,6 +80,11 @@ export default function App() {
       ...g,
       members: g.members.map((m) => (m.userId === user.id ? { ...m, user } : m)),
       expenses: g.expenses.map((e) => (e.paidById === user.id ? { ...e, paidBy: user } : e)),
+      settlementPayments: g.settlementPayments.map((p) => ({
+        ...p,
+        from: p.fromId === user.id ? user : p.from,
+        to: p.toId === user.id ? user : p.to,
+      })),
     })));
   };
 
@@ -94,6 +101,19 @@ export default function App() {
             <GroupDetail
               group={group}
               onAddExpense={() => setModal("newExpense")}
+              onEditExpense={(expense) => { setEditingExpense(expense); setModal("editExpense"); }}
+              onDeleteExpense={async (expenseId) => {
+                if (!confirm("¿Eliminar este gasto?")) return;
+                const res = await fetch(`/api/groups/${group.id}/expenses/${expenseId}`, { method: "DELETE" });
+                if (res.ok) setGroups((gs) => gs.map((g) => g.id === group.id ? { ...g, expenses: g.expenses.filter((e) => e.id !== expenseId) } : g));
+              }}
+              onMarkPaid={async (debt) => {
+                const res = await fetch(`/api/groups/${group.id}/settlements`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromId: debt.from.id, toId: debt.to.id, amount: debt.amount }) });
+                if (res.ok) {
+                  const payment = await res.json();
+                  setGroups((gs) => gs.map((g) => g.id === group.id ? { ...g, settlementPayments: [payment, ...g.settlementPayments] } : g));
+                }
+              }}
               onShowInvite={() => setModal("invite")}
               onDelete={async () => {
                 if (!confirm("¿Eliminar esta juntada? Se borrarán todos los gastos.")) return;
@@ -124,6 +144,18 @@ export default function App() {
               g.id === group.id ? { ...g, expenses: [...g.expenses, newExpense] } : g
             ));
             setModal(null);
+          }
+        }} />
+      )}
+      {modal === "editExpense" && group && editingExpense && (
+        <ExpenseModal group={group} expense={editingExpense} onClose={() => { setModal(null); setEditingExpense(null); }} onSubmit={async (data) => {
+          const res = await fetch(`/api/groups/${group.id}/expenses/${editingExpense.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+          if (res.ok) {
+            const updated = await res.json();
+            setGroups((gs) => gs.map((g) =>
+              g.id === group.id ? { ...g, expenses: g.expenses.map((e) => e.id === updated.id ? updated : e) } : g
+            ));
+            setModal(null); setEditingExpense(null);
           }
         }} />
       )}
@@ -409,13 +441,17 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
   );
 }
 
-function GroupDetail({ group, onAddExpense, onShowInvite, onDelete }: { group: Group; onAddExpense: () => void; onShowInvite: () => void; onDelete: () => void }) {
+function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onShowInvite, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onShowInvite: () => void; onDelete: () => void }) {
   const members = group.members.map((m) => m.user);
   const total = group.expenses.reduce((s, e) => s + e.amount, 0);
   const perPerson = members.length > 0 ? total / members.length : 0;
   const paid: Record<string, number> = {};
   members.forEach((m) => (paid[m.id] = 0));
   group.expenses.forEach((e) => { if (paid[e.paidById] !== undefined) paid[e.paidById] += e.amount; });
+  group.settlementPayments.forEach((p) => {
+    if (paid[p.fromId] !== undefined) paid[p.fromId] += p.amount;
+    if (paid[p.toId] !== undefined) paid[p.toId] -= p.amount;
+  });
   const eventDate = group.eventDate ? new Date(group.eventDate) : null;
 
   return (
@@ -467,23 +503,31 @@ function GroupDetail({ group, onAddExpense, onShowInvite, onDelete }: { group: G
       {[...group.expenses].reverse().map((e) => {
         const share = members.length > 0 ? e.amount / members.length : 0;
         return (
-          <div key={e.id} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div key={e.id} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{e.desc}</div>
               <div style={{ fontSize: 12, color: P.muted, marginTop: 2 }}>{e.paidBy.avatar} {e.paidBy.name} pagó · {e.date}</div>
               <div style={{ fontSize: 11, color: P.muted, marginTop: 1 }}>{fmt(share)} c/u</div>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: P.accent2 }}>{fmt(e.amount)}</div>
+            <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: P.accent2 }}>{fmt(e.amount)}</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => onEditExpense(e)} style={{ ...ghostBtn, padding: "5px 9px", fontSize: 11 }}>Editar</button>
+                <button onClick={() => onDeleteExpense(e.id)} style={{ ...ghostBtn, borderColor: P.red, color: P.red, padding: "5px 9px", fontSize: 11 }}>Borrar</button>
+              </div>
+            </div>
           </div>
         );
       })}
-      <Settlements members={members} paid={paid} perPerson={perPerson} />
+      <Settlements members={members} paid={paid} perPerson={perPerson} payments={group.settlementPayments} onMarkPaid={onMarkPaid} />
     </div>
   );
 }
 
-function Settlements({ members, paid, perPerson }: { members: User[]; paid: Record<string, number>; perPerson: number }) {
-  const debts: { from: User & { bal: number }; to: User & { bal: number }; amount: number }[] = [];
+type Debt = { from: User & { bal: number }; to: User & { bal: number }; amount: number };
+
+function Settlements({ members, paid, perPerson, payments, onMarkPaid }: { members: User[]; paid: Record<string, number>; perPerson: number; payments: SettlementPayment[]; onMarkPaid: (debt: Debt) => void }) {
+  const debts: Debt[] = [];
   const g = members.filter((m) => (paid[m.id] || 0) - perPerson > 1).sort((a, b) => ((paid[b.id] || 0) - perPerson) - ((paid[a.id] || 0) - perPerson)).map((m) => ({ ...m, bal: (paid[m.id] || 0) - perPerson }));
   const t = members.filter((m) => (paid[m.id] || 0) - perPerson < -1).sort((a, b) => ((paid[a.id] || 0) - perPerson) - ((paid[b.id] || 0) - perPerson)).map((m) => ({ ...m, bal: (paid[m.id] || 0) - perPerson }));
   let gi = 0, ti = 0;
@@ -505,8 +549,19 @@ function Settlements({ members, paid, perPerson }: { members: User[]; paid: Reco
           <span style={{ fontWeight: 900, color: P.green, fontSize: 16 }}>{fmt(d.amount)}</span>
           <span style={{ color: P.muted }}>a</span>
           <span style={{ fontSize: 20 }}>{d.to.avatar}</span><span style={{ fontWeight: 700 }}>{d.to.name}</span><AliasPill alias={d.to.alias} />
+          <button onClick={() => onMarkPaid(d)} style={{ ...ghostBtn, borderColor: P.green, color: P.green, marginLeft: "auto", padding: "6px 10px", fontSize: 11 }}>Marcar pagado</button>
         </div>
       ))}
+      {payments.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ color: P.muted, fontSize: 11, fontWeight: 800, marginBottom: 8, textTransform: "uppercase" }}>Pagos registrados</div>
+          {payments.slice(0, 5).map((p) => (
+            <div key={p.id} style={{ color: P.muted, fontSize: 12, marginBottom: 5 }}>
+              {p.from.avatar} {p.from.name} pagó {fmt(p.amount)} a {p.to.avatar} {p.to.name}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -607,11 +662,20 @@ function NewGroupModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
 }
 
 function NewExpenseModal({ group, me, onClose, onAdd }: { group: Group; me: User; onClose: () => void; onAdd: (data: NewExpenseData) => void }) {
-  const [desc, setDesc] = useState(""); const [amount, setAmount] = useState(""); const [paidById, setPaidById] = useState(me.id);
+  return <ExpenseModal group={group} expense={null} defaultPaidById={me.id} onClose={onClose} onSubmit={onAdd} />;
+}
+
+function ExpenseModal({ group, expense, defaultPaidById, onClose, onSubmit }: { group: Group; expense: Expense | null; defaultPaidById?: string; onClose: () => void; onSubmit: (data: NewExpenseData) => void }) {
+  const [desc, setDesc] = useState(expense?.desc ?? "");
+  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const [paidById, setPaidById] = useState(expense?.paidById ?? defaultPaidById ?? group.members[0]?.userId ?? "");
+  const [date, setDate] = useState(expense?.date ?? new Date().toISOString().slice(0, 10));
+  const title = expense ? "Editar gasto" : "Agregar gasto";
   return (
-    <Modal title="Agregar gasto" onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <div style={{ marginBottom: 14 }}><label style={lbl}>¿Qué se compró?</label><input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Carne, vino..." style={inp} autoFocus /></div>
       <div style={{ marginBottom: 16 }}><label style={lbl}>Monto ($)</label><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" type="number" style={inp} /></div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Fecha</label><input value={date} onChange={(e) => setDate(e.target.value)} type="date" style={inp} /></div>
       <div style={{ marginBottom: 24 }}>
         <label style={lbl}>¿Quién pagó?</label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -622,7 +686,7 @@ function NewExpenseModal({ group, me, onClose, onAdd }: { group: Group; me: User
           ))}
         </div>
       </div>
-      <button onClick={() => desc.trim() && amount && onAdd({ desc: desc.trim(), amount, paidById, date: new Date().toISOString().slice(0, 10) })} disabled={!desc.trim() || !amount} style={primBtn(true)}>Agregar gasto</button>
+      <button onClick={() => desc.trim() && amount && onSubmit({ desc: desc.trim(), amount, paidById, date })} disabled={!desc.trim() || !amount || !paidById || !date} style={primBtn(true)}>{expense ? "Guardar gasto" : "Agregar gasto"}</button>
     </Modal>
   );
 }

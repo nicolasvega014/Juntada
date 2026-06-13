@@ -19,6 +19,7 @@ export async function GET(
     include: {
       members: { include: { user: { select: userPublicSelect } } },
       expenses: { include: { paidBy: { select: userPublicSelect } } },
+      settlementPayments: { include: { from: { select: userPublicSelect }, to: { select: userPublicSelect } }, orderBy: { createdAt: "desc" } },
     },
   });
 
