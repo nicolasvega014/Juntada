@@ -215,11 +215,63 @@ function TopNav({ me, view, group, onBack, onLogout }: { me: User; view: string;
         {view !== "groups" && <button onClick={onBack} style={{ ...iconBtn, fontSize: 20 }}>←</button>}
         <span style={{ fontSize: 19, fontWeight: 900, letterSpacing: -0.5 }}>{title}</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 20 }}>{me.avatar}</span>
-        <span style={{ fontSize: 13, color: P.muted, fontWeight: 600 }}>{me.name}</span>
-        <button onClick={onLogout} style={{ ...iconBtn, fontSize: 12, color: P.muted }}>salir</button>
-      </div>
+      <AccountMenu me={me} onLogout={onLogout} />
+    </div>
+  );
+}
+
+function AccountMenu({ me, onLogout }: { me: User; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: open ? P.card2 : "rgba(255,255,255,0.03)",
+          border: `1px solid ${open ? P.accent : P.border}`,
+          borderRadius: 999,
+          color: P.text,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "'Syne', sans-serif",
+          padding: "6px 8px 6px 6px",
+          transition: "all 0.15s",
+        }}
+      >
+        <span style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: "50%", display: "grid", fontSize: 18, height: 30, placeItems: "center", width: 30 }}>{me.avatar}</span>
+        <span style={{ display: "grid", lineHeight: 1.1, maxWidth: 94, textAlign: "left" }}>
+          <span style={{ fontSize: 12, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{me.name}</span>
+          <span style={{ color: P.muted, fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{me.alias || "sin alias"}</span>
+        </span>
+        <span style={{ color: P.muted, fontSize: 11, transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>⌄</span>
+      </button>
+
+      {open && (
+        <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.35)", minWidth: 230, padding: 14, position: "absolute", right: 0, top: 48 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
+            <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 16, display: "grid", fontSize: 28, height: 52, placeItems: "center", width: 52 }}>{me.avatar}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{me.name}</div>
+              <div style={{ color: P.muted, fontSize: 11, fontWeight: 700, marginTop: 4, textTransform: "uppercase" }}>Cuenta activa</div>
+            </div>
+          </div>
+          <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            <div style={{ color: P.muted, fontSize: 10, fontWeight: 800, marginBottom: 8, textTransform: "uppercase" }}>Alias de transferencia</div>
+            <AliasPill alias={me.alias} />
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            style={{ ...primBtn(true), background: "transparent", border: `1px solid ${P.red}66`, color: P.red, fontSize: 13, padding: "11px 12px" }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      )}
     </div>
   );
 }
