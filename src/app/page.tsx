@@ -18,6 +18,11 @@ const lbl: React.CSSProperties = { display: "block", fontSize: 11, color: P.mute
 const primBtn = (full?: boolean): React.CSSProperties => ({ background: P.accent, color: "#fff", border: "none", borderRadius: 12, padding: full ? "14px" : "10px 20px", width: full ? "100%" : "auto", cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: full ? 16 : 14 });
 const ghostBtn: React.CSSProperties = { background: "transparent", color: P.accent, border: `1px solid ${P.accent}`, borderRadius: 10, padding: "7px 14px", cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13 };
 const iconBtn: React.CSSProperties = { background: "transparent", border: "none", color: P.text, cursor: "pointer", fontSize: 18, padding: "4px 8px", fontFamily: "'Syne', sans-serif" };
+const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 900, letterSpacing: 0.3, textTransform: "uppercase", color: P.muted };
+const iconAction = (tone: "default" | "danger" | "green" = "default"): React.CSSProperties => {
+  const color = tone === "danger" ? P.red : tone === "green" ? P.green : P.accent2;
+  return { background: `${color}14`, border: `1px solid ${color}55`, borderRadius: 10, color, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 900, height: 32, minWidth: 32, padding: "0 9px" };
+};
 
 type User = { id: string; name: string; avatar: string; alias?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
@@ -466,10 +471,10 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
   const eventDate = group.eventDate ? new Date(group.eventDate) : null;
 
   return (
-    <div style={{ paddingTop: 12 }}>
+    <div style={{ paddingTop: 14 }}>
       {eventDate && (
-        <div style={{ background: `${P.accent2}18`, border: `1px solid ${P.accent2}44`, borderRadius: 16, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 28 }}>📅</span>
+        <div style={{ background: `${P.accent2}12`, border: `1px solid ${P.accent2}40`, borderRadius: 14, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ background: `${P.accent2}18`, borderRadius: 10, color: P.accent2, display: "grid", fontSize: 18, height: 36, placeItems: "center", width: 36 }}>⌚</span>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: P.accent2 }}>{eventDate.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</div>
             <div style={{ fontSize: 13, color: P.muted }}>{eventDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} hs</div>
@@ -477,27 +482,38 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
         </div>
       )}
 
-      <div style={{ background: `linear-gradient(135deg, ${P.accent}22, ${P.accent2}22)`, border: `1px solid ${P.accent}44`, borderRadius: 20, padding: "20px 22px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: P.muted, marginBottom: 4 }}>Total gastado</div>
-        <div style={{ fontSize: 40, fontWeight: 900, color: P.accent2, lineHeight: 1 }}>{fmt(total)}</div>
-        <div style={{ fontSize: 13, color: P.muted, marginTop: 6 }}>{fmt(perPerson)} por persona · {members.length} persona{members.length !== 1 ? "s" : ""}</div>
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <span style={{ fontWeight: 800, fontSize: 15 }}>Participantes</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onShowInvite} style={ghostBtn}>🔗 Invitar</button>
-            <button onClick={onDelete} style={{ ...ghostBtn, color: P.red, borderColor: P.red }}>🗑️</button>
+      <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 18, padding: 18, marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" }}>
+          <div>
+            <div style={{ ...sectionTitle, marginBottom: 8 }}>Resumen</div>
+            <div style={{ fontSize: 38, fontWeight: 900, color: P.accent2, lineHeight: 1 }}>{fmt(total)}</div>
+            <div style={{ fontSize: 13, color: P.muted, marginTop: 8 }}>{fmt(perPerson)} por persona</div>
+          </div>
+          <div style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: "12px 14px", textAlign: "right", minWidth: 98 }}>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>{members.length}</div>
+            <div style={{ color: P.muted, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>personas</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+          <button onClick={onAddExpense} style={{ ...primBtn(true), padding: "12px", fontSize: 14 }}>+ Gasto</button>
+          <button onClick={onShowInvite} style={{ ...ghostBtn, borderColor: P.accent2, color: P.accent2, padding: "12px" }}>Copiar invitación</button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <span style={sectionTitle}>Participantes</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onDelete} title="Eliminar juntada" style={iconAction("danger")}>×</button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))", gap: 10 }}>
           {members.map((m) => {
             const bal = (paid[m.id] || 0) - perPerson;
             return (
-              <div key={m.id} style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: "10px 14px", textAlign: "center", minWidth: 72 }}>
-                <div style={{ fontSize: 26 }}>{m.avatar}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2 }}>{m.name}</div>
+              <div key={m.id} style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: "12px 10px", textAlign: "center", minWidth: 0 }}>
+                <div style={{ fontSize: 24 }}>{m.avatar}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
                 <div style={{ marginTop: 6 }}><AliasPill alias={m.alias} /></div>
                 <div style={{ fontSize: 11, color: bal >= 0 ? P.green : P.red, fontWeight: 700, marginTop: 3 }}>{bal >= 0 ? "+" : ""}{fmt(bal)}</div>
               </div>
@@ -507,24 +523,24 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <span style={{ fontWeight: 800, fontSize: 15 }}>Gastos ({group.expenses.length})</span>
-        <button onClick={onAddExpense} style={primBtn()}>+ Gasto</button>
+        <span style={sectionTitle}>Gastos ({group.expenses.length})</span>
+        <button onClick={onAddExpense} style={iconAction()}>+</button>
       </div>
-      {group.expenses.length === 0 && <div style={{ color: P.muted, textAlign: "center", padding: "28px 0", fontSize: 14 }}>Ningún gasto todavía.</div>}
+      {group.expenses.length === 0 && <div style={{ background: P.card, border: `1px dashed ${P.border}`, borderRadius: 14, color: P.muted, textAlign: "center", padding: "28px 0", fontSize: 14 }}>Ningún gasto todavía.</div>}
       {[...group.expenses].reverse().map((e) => {
         const share = members.length > 0 ? e.amount / members.length : 0;
         return (
-          <div key={e.id} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{e.desc}</div>
+          <div key={e.id} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "14px", marginBottom: 9, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.desc}</div>
               <div style={{ fontSize: 12, color: P.muted, marginTop: 2 }}>{e.paidBy.avatar} {e.paidBy.name} pagó · {e.date}</div>
               <div style={{ fontSize: 11, color: P.muted, marginTop: 1 }}>{fmt(share)} c/u</div>
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: P.accent2 }}>{fmt(e.amount)}</div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => onEditExpense(e)} style={{ ...ghostBtn, padding: "5px 9px", fontSize: 11 }}>Editar</button>
-                <button onClick={() => onDeleteExpense(e.id)} style={{ ...ghostBtn, borderColor: P.red, color: P.red, padding: "5px 9px", fontSize: 11 }}>Borrar</button>
+                <button onClick={() => onEditExpense(e)} title="Editar gasto" style={iconAction()}>✎</button>
+                <button onClick={() => onDeleteExpense(e.id)} title="Borrar gasto" style={iconAction("danger")}>×</button>
               </div>
             </div>
           </div>
@@ -549,23 +565,25 @@ function Settlements({ members, paid, perPerson, payments, onMarkPaid }: { membe
     if (Math.abs(g[gi].bal) < 1) gi++;
     if (Math.abs(t[ti].bal) < 1) ti++;
   }
-  if (debts.length === 0) return <div style={{ textAlign: "center", color: P.green, padding: "20px 0", fontSize: 14, fontWeight: 700 }}>✅ ¡Todo saldado!</div>;
+  if (debts.length === 0) return <div style={{ background: `${P.green}12`, border: `1px solid ${P.green}40`, borderRadius: 14, textAlign: "center", color: P.green, padding: "18px 0", fontSize: 14, fontWeight: 800, marginTop: 18 }}>Todo saldado</div>;
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>💸 Quién le debe a quién</div>
+      <div style={{ ...sectionTitle, marginBottom: 10 }}>Balances pendientes</div>
       {debts.map((d, i) => (
-        <div key={i} style={{ background: `${P.green}14`, border: `1px solid ${P.green}44`, borderRadius: 12, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 14, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 20 }}>{d.from.avatar}</span><span style={{ fontWeight: 700 }}>{d.from.name}</span><AliasPill alias={d.from.alias} />
-          <span style={{ color: P.muted }}>le debe</span>
-          <span style={{ fontWeight: 900, color: P.green, fontSize: 16 }}>{fmt(d.amount)}</span>
-          <span style={{ color: P.muted }}>a</span>
-          <span style={{ fontSize: 20 }}>{d.to.avatar}</span><span style={{ fontWeight: 700 }}>{d.to.name}</span><AliasPill alias={d.to.alias} />
-          <button onClick={() => onMarkPaid(d)} style={{ ...ghostBtn, borderColor: P.green, color: P.green, marginLeft: "auto", padding: "6px 10px", fontSize: 11 }}>Marcar pagado</button>
+        <div key={i} style={{ background: `${P.green}10`, border: `1px solid ${P.green}40`, borderRadius: 14, padding: 14, marginBottom: 9, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 20 }}>{d.from.avatar}</span><span style={{ fontWeight: 800 }}>{d.from.name}</span><AliasPill alias={d.from.alias} />
+            <span style={{ color: P.muted }}>le debe</span>
+            <span style={{ fontWeight: 900, color: P.green, fontSize: 17 }}>{fmt(d.amount)}</span>
+            <span style={{ color: P.muted }}>a</span>
+            <span style={{ fontSize: 20 }}>{d.to.avatar}</span><span style={{ fontWeight: 800 }}>{d.to.name}</span><AliasPill alias={d.to.alias} />
+          </div>
+          <button onClick={() => onMarkPaid(d)} style={{ ...iconAction("green"), width: "100%", height: 36 }}>Marcar pagado</button>
         </div>
       ))}
       {payments.length > 0 && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ color: P.muted, fontSize: 11, fontWeight: 800, marginBottom: 8, textTransform: "uppercase" }}>Pagos registrados</div>
+        <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, marginTop: 14, padding: 14 }}>
+          <div style={{ ...sectionTitle, fontSize: 11, marginBottom: 8 }}>Pagos registrados</div>
           {payments.slice(0, 5).map((p) => (
             <div key={p.id} style={{ color: P.muted, fontSize: 12, marginBottom: 5 }}>
               {p.from.avatar} {p.from.name} pagó {fmt(p.amount)} a {p.to.avatar} {p.to.name}
