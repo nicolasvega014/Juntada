@@ -126,6 +126,13 @@ export default function App() {
                   setGroups((gs) => gs.map((g) => g.id === group.id ? { ...g, settlementPayments: [payment, ...g.settlementPayments] } : g));
                 }
               }}
+              onUndoPayment={async (paymentId) => {
+                if (!confirm("¿Deshacer este pago registrado?")) return;
+                const res = await fetch(`/api/groups/${group.id}/settlements/${paymentId}`, { method: "DELETE" });
+                if (res.ok) {
+                  setGroups((gs) => gs.map((g) => g.id === group.id ? { ...g, settlementPayments: g.settlementPayments.filter((p) => p.id !== paymentId) } : g));
+                }
+              }}
               onShowInvite={() => setModal("invite")}
               onSetStatus={async (nextStatus) => {
                 const res = await fetch(`/api/groups/${group.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) });
@@ -549,7 +556,7 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
   );
 }
 
-function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onShowInvite, onSetStatus, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onShowInvite: () => void; onSetStatus: (status: "active" | "finalized") => void; onDelete: () => void }) {
+function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onUndoPayment, onShowInvite, onSetStatus, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onUndoPayment: (paymentId: string) => void; onShowInvite: () => void; onSetStatus: (status: "active" | "finalized") => void; onDelete: () => void }) {
   const members = group.members.map((m) => m.user);
   const total = group.expenses.reduce((s, e) => s + e.amount, 0);
   const perPerson = members.length > 0 ? total / members.length : 0;
@@ -640,14 +647,14 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
           </div>
         );
       })}
-      <Settlements members={members} paid={paid} perPerson={perPerson} payments={group.settlementPayments} onMarkPaid={onMarkPaid} />
+      <Settlements members={members} paid={paid} perPerson={perPerson} payments={group.settlementPayments} onMarkPaid={onMarkPaid} onUndoPayment={onUndoPayment} />
     </div>
   );
 }
 
 type Debt = { from: User & { bal: number }; to: User & { bal: number }; amount: number };
 
-function Settlements({ members, paid, perPerson, payments, onMarkPaid }: { members: User[]; paid: Record<string, number>; perPerson: number; payments: SettlementPayment[]; onMarkPaid: (debt: Debt) => void }) {
+function Settlements({ members, paid, perPerson, payments, onMarkPaid, onUndoPayment }: { members: User[]; paid: Record<string, number>; perPerson: number; payments: SettlementPayment[]; onMarkPaid: (debt: Debt) => void; onUndoPayment: (paymentId: string) => void }) {
   const debts: Debt[] = [];
   const g = members.filter((m) => (paid[m.id] || 0) - perPerson > 1).sort((a, b) => ((paid[b.id] || 0) - perPerson) - ((paid[a.id] || 0) - perPerson)).map((m) => ({ ...m, bal: (paid[m.id] || 0) - perPerson }));
   const t = members.filter((m) => (paid[m.id] || 0) - perPerson < -1).sort((a, b) => ((paid[a.id] || 0) - perPerson) - ((paid[b.id] || 0) - perPerson)).map((m) => ({ ...m, bal: (paid[m.id] || 0) - perPerson }));
@@ -679,8 +686,9 @@ function Settlements({ members, paid, perPerson, payments, onMarkPaid }: { membe
         <div style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, marginTop: 14, padding: 14 }}>
           <div style={{ ...sectionTitle, fontSize: 11, marginBottom: 8 }}>Pagos registrados</div>
           {payments.slice(0, 5).map((p) => (
-            <div key={p.id} style={{ color: P.muted, fontSize: 12, marginBottom: 5 }}>
-              {p.from.avatar} {p.from.name} pagó {fmt(p.amount)} a {p.to.avatar} {p.to.name}
+            <div key={p.id} style={{ alignItems: "center", color: P.muted, display: "flex", fontSize: 12, gap: 8, justifyContent: "space-between", marginBottom: 7 }}>
+              <span>{p.from.avatar} {p.from.name} pagó {fmt(p.amount)} a {p.to.avatar} {p.to.name}</span>
+              <button onClick={() => onUndoPayment(p.id)} title="Deshacer pago" style={iconAction("danger")}>Deshacer</button>
             </div>
           ))}
         </div>
