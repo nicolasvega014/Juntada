@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  password  String
+  avatar    String
+  createdAt DateTime @default(now())
+
+  groups    GroupMember[]
+  expenses  Expense[]
+  messages  Message[]
+}
+
+model Group {
+  id          String    @id @default(cuid())
+  name        String
+  emoji       String
+  inviteCode  String    @unique @default(cuid())
+  eventDate   DateTime?
+  createdAt   DateTime  @default(now())
+
+  members     GroupMember[]
+  expenses    Expense[]
+  messages    Message[]
+}
+
+model GroupMember {
+  userId    String
+  groupId   String
+  joinedAt  DateTime @default(now())
+
+  user      User  @relation(fields: [userId], references: [id])
+  group     Group @relation(fields: [groupId], references: [id])
+
+  @@id([userId, groupId])
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  desc      String
+  amount    Float
+  date      String
+  createdAt DateTime @default(now())
+
+  paidById  String
+  groupId   String
+
+  paidBy    User  @relation(fields: [paidById], references: [id])
+  group     Group @relation(fields: [groupId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+
+  userId    String
+  groupId   String
+
+  user      User  @relation(fields: [userId], references: [id])
+  group     Group @relation(fields: [groupId], references: [id])
+}
