@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isGroupAdmin } from "@/lib/group-permissions";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
@@ -17,10 +18,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
 
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
-    });
-    if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const admin = await isGroupAdmin(groupId, userId);
+    if (!admin) return NextResponse.json({ error: "Solo el admin puede cambiar el estado" }, { status: 403 });
 
     const group = await prisma.group.update({
       where: { id: groupId },
@@ -40,9 +39,12 @@ export async function DELETE(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const userId = session?.user?.id;
+    if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const { groupId } = await params;
+    const admin = await isGroupAdmin(groupId, userId);
+    if (!admin) return NextResponse.json({ error: "Solo el admin puede eliminar la juntada" }, { status: 403 });
 
     await prisma.message.deleteMany({ where: { groupId } });
     await prisma.settlementPayment.deleteMany({ where: { groupId } });

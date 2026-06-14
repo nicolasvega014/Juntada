@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isGroupAdmin } from "@/lib/group-permissions";
 import { prisma } from "@/lib/prisma";
 
 const userPublicSelect = {
@@ -26,6 +27,8 @@ export async function PATCH(
   const { groupId, expenseId } = await params;
   const member = await ensureGroupMember(groupId, userId);
   if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const admin = await isGroupAdmin(groupId, userId);
+  if (!admin) return NextResponse.json({ error: "Solo el admin puede editar gastos" }, { status: 403 });
 
   const { desc, amount, paidById, date } = await req.json();
   const cleanDesc = typeof desc === "string" ? desc.trim() : "";
@@ -61,6 +64,8 @@ export async function DELETE(
   const { groupId, expenseId } = await params;
   const member = await ensureGroupMember(groupId, userId);
   if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const admin = await isGroupAdmin(groupId, userId);
+  if (!admin) return NextResponse.json({ error: "Solo el admin puede borrar gastos" }, { status: 403 });
 
   const existing = await prisma.expense.findFirst({ where: { id: expenseId, groupId } });
   if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });

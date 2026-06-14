@@ -42,6 +42,7 @@ model Group {
 model GroupMember {
   userId    String
   groupId   String
+  role      String   @default("member")
   joinedAt  DateTime @default(now())
 
   user      User  @relation(fields: [userId], references: [id])

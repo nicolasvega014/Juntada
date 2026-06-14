@@ -17,7 +17,7 @@ export async function GET(
   const group = await prisma.group.findUnique({
     where: { inviteCode: code },
     include: {
-      members: { include: { user: { select: userPublicSelect } } },
+      members: { include: { user: { select: userPublicSelect } }, orderBy: { joinedAt: "asc" } },
       expenses: { include: { paidBy: { select: userPublicSelect } } },
       settlementPayments: { include: { from: { select: userPublicSelect }, to: { select: userPublicSelect } }, orderBy: { createdAt: "desc" } },
     },
@@ -45,7 +45,7 @@ export async function POST(
 
   if (!existing) {
     await prisma.groupMember.create({
-      data: { userId, groupId: group.id },
+      data: { userId, groupId: group.id, role: "member" },
     });
   }
 

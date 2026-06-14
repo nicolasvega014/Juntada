@@ -29,7 +29,7 @@ const iconStyle = { width: 16, height: 16, strokeWidth: 2.4 };
 type User = { id: string; name: string; avatar: string; alias?: string | null; email?: string | null };
 type Expense = { id: string; desc: string; amount: number; date: string; paidBy: User; paidById: string };
 type SettlementPayment = { id: string; amount: number; createdAt: string; from: User; fromId: string; to: User; toId: string };
-type Member = { user: User; userId: string };
+type Member = { user: User; userId: string; role: "admin" | "member" };
 type Group = { id: string; name: string; emoji: string; inviteCode: string; status: "active" | "finalized"; eventDate?: string; endedAt?: string | null; members: Member[]; expenses: Expense[]; settlementPayments: SettlementPayment[] };
 type AppSessionUser = { id?: string; name?: string | null; email?: string | null; avatar?: string | null; alias?: string | null };
 type NewGroupData = { name: string; emoji: string; eventDate: string | null };
@@ -112,6 +112,7 @@ export default function App() {
           {view === "group" && group && (
             <GroupDetail
               group={group}
+              me={me}
               onAddExpense={() => setModal("newExpense")}
               onEditExpense={(expense) => { setEditingExpense(expense); setModal("editExpense"); }}
               onDeleteExpense={async (expenseId) => {
@@ -556,8 +557,11 @@ function GroupList({ groups, today, onSelect, onNew }: { groups: Group[]; today:
   );
 }
 
-function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onUndoPayment, onShowInvite, onSetStatus, onDelete }: { group: Group; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onUndoPayment: (paymentId: string) => void; onShowInvite: () => void; onSetStatus: (status: "active" | "finalized") => void; onDelete: () => void }) {
+function GroupDetail({ group, me, onAddExpense, onEditExpense, onDeleteExpense, onMarkPaid, onUndoPayment, onShowInvite, onSetStatus, onDelete }: { group: Group; me: User; onAddExpense: () => void; onEditExpense: (expense: Expense) => void; onDeleteExpense: (expenseId: string) => void; onMarkPaid: (debt: Debt) => void; onUndoPayment: (paymentId: string) => void; onShowInvite: () => void; onSetStatus: (status: "active" | "finalized") => void; onDelete: () => void }) {
   const members = group.members.map((m) => m.user);
+  const hasAdmin = group.members.some((m) => m.role === "admin");
+  const myMembership = group.members.find((m) => m.userId === me.id);
+  const isAdmin = myMembership?.role === "admin" || (!hasAdmin && group.members[0]?.userId === me.id);
   const total = group.expenses.reduce((s, e) => s + e.amount, 0);
   const perPerson = members.length > 0 ? total / members.length : 0;
   const paid: Record<string, number> = {};
@@ -598,23 +602,26 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
           <button onClick={onAddExpense} disabled={finalized} style={{ ...primBtn(true), alignItems: "center", display: "flex", gap: 8, justifyContent: "center", opacity: finalized ? 0.55 : 1, padding: "12px", fontSize: 14 }}><Plus style={iconStyle} /> Gasto</button>
           <button onClick={onShowInvite} style={{ ...ghostBtn, alignItems: "center", borderColor: P.accent2, color: P.accent2, display: "flex", gap: 8, justifyContent: "center", padding: "12px" }}><Link2 style={iconStyle} /> Invitación</button>
         </div>
-        <button onClick={() => onSetStatus(finalized ? "active" : "finalized")} style={{ ...ghostBtn, borderColor: finalized ? P.accent2 : P.green, color: finalized ? P.accent2 : P.green, marginTop: 10, width: "100%", padding: "11px 12px" }}>{finalized ? "Reabrir juntada" : "Finalizar juntada"}</button>
+        {isAdmin && <button onClick={() => onSetStatus(finalized ? "active" : "finalized")} style={{ ...ghostBtn, borderColor: finalized ? P.accent2 : P.green, color: finalized ? P.accent2 : P.green, marginTop: 10, width: "100%", padding: "11px 12px" }}>{finalized ? "Reabrir juntada" : "Finalizar juntada"}</button>}
       </div>
 
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <span style={sectionTitle}>Participantes</span>
-          <div style={{ display: "flex", gap: 8 }}>
+          {isAdmin && <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onDelete} title="Eliminar juntada" style={iconAction("danger")}><Trash2 style={iconStyle} /></button>
-          </div>
+          </div>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))", gap: 10 }}>
-          {members.map((m) => {
+          {group.members.map((member) => {
+            const m = member.user;
             const bal = (paid[m.id] || 0) - perPerson;
+            const isMemberAdmin = member.role === "admin" || (!hasAdmin && group.members[0]?.userId === member.userId);
             return (
               <div key={m.id} style={{ background: P.card2, border: `1px solid ${P.border}`, borderRadius: 14, padding: "12px 10px", textAlign: "center", minWidth: 0 }}>
                 <div style={{ fontSize: 24 }}>{m.avatar}</div>
                 <div style={{ fontSize: 12, fontWeight: 800, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                {isMemberAdmin && <div style={{ color: P.accent2, fontSize: 9, fontWeight: 900, marginTop: 3, textTransform: "uppercase" }}>Admin</div>}
                 <div style={{ marginTop: 6 }}><AliasPill alias={m.alias} /></div>
                 <div style={{ fontSize: 11, color: bal >= 0 ? P.green : P.red, fontWeight: 700, marginTop: 3 }}>{bal >= 0 ? "+" : ""}{fmt(bal)}</div>
               </div>
@@ -639,10 +646,10 @@ function GroupDetail({ group, onAddExpense, onEditExpense, onDeleteExpense, onMa
             </div>
             <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: P.accent2 }}>{fmt(e.amount)}</div>
-              <div style={{ display: "flex", gap: 6 }}>
+              {isAdmin && <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => onEditExpense(e)} title="Editar gasto" style={iconAction()}><Edit3 style={iconStyle} /></button>
                 <button onClick={() => onDeleteExpense(e.id)} title="Borrar gasto" style={iconAction("danger")}><Trash2 style={iconStyle} /></button>
-              </div>
+              </div>}
             </div>
           </div>
         );
